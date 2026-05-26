@@ -5,14 +5,17 @@
 #include "tonc_video.h"
 
 #include <string.h>
+#include <stddef.h>
 
-extern const unsigned char videoData[];
+extern const unsigned char videoData[21447];
 
 #define SCREEN_X M4_WIDTH
 #define SCREEN_Y M4_HEIGHT
 
 #define INPUT_X 24
 #define INPUT_Y 16
+
+#define FPS 3
 
 #define X_DOWNSCALE (SCREEN_X / INPUT_X)
 #define Y_DOWNSCALE (SCREEN_Y / INPUT_Y)
@@ -32,6 +35,9 @@ u8 getFromFile() {
     if (numCalls % 8 == 0) {
         memcpy(&cache, &(videoData[fileIdx]), 7);
         fileIdx += 7;
+        if(fileIdx >= sizeof(videoData)){
+          fileIdx = 0;
+        }
     }
     u8 result;
     switch (numCalls % 8) {
@@ -64,9 +70,21 @@ u8 getFromFile() {
     return result;
 }
 
+static volatile unsigned numFrames = 0;
+void vblankIntHandler(){
+  ++numFrames;
+}
+
+void waitForNextFrame(){
+  while(numFrames < (60 / FPS)){
+    ;
+  }
+  numFrames = 0;
+}
+
 int main() {
   irq_init(NULL);
-  irq_add(II_VBLANK, NULL);
+  irq_add(II_VBLANK, vblankIntHandler);
 
   pal_bg_mem[BLACK] = 0;
   pal_bg_mem[WHITE] = 0x7FFF;
@@ -76,7 +94,7 @@ int main() {
   unsigned numChunks = 0;
   unsigned numChunksWritten = 0;
   bool newFrame = true;
-  VBlankIntrWait();
+  waitForNextFrame();
   while (1) {
     numChunks = getFromFile();
     for (unsigned i = 0; i < numChunks; ++i) {
@@ -93,14 +111,13 @@ int main() {
         numChunksWritten = 0;
         newFrame = true;
         currentColor = (getFromFile() == 0) ? BLACK : WHITE;
-        VBlankIntrWait();
+        waitForNextFrame();
         writePage = vid_flip();
       } else {
         newFrame = false;
       }
     }
-    if (newFrame) {
-    } else {
+    if (!newFrame) {
       currentColor = (currentColor == WHITE) ? BLACK : WHITE;
     }
   }
