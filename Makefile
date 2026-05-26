@@ -27,10 +27,11 @@ INCLUDES	:=
 #---------------------------------------------------------------------------------
 ARCH	:=	-mthumb -mthumb-interwork
 
-CFLAGS	:=	-g -Wall -Ofast\
+CFLAGS	:=	-g -Wall -Oz\
 			-mcpu=arm7tdmi -mtune=arm7tdmi\
  			-fomit-frame-pointer\
 			-ffast-math \
+			-std=c11 \
 			$(ARCH)
 
 CFLAGS	+=	$(INCLUDE)
