@@ -7,13 +7,13 @@
 #include <string.h>
 #include <stddef.h>
 
-extern const unsigned char videoData[21447];
+extern const unsigned char videoData[22918];
 
 #define SCREEN_X M4_WIDTH
 #define SCREEN_Y M4_HEIGHT
 
-#define INPUT_X 24
-#define INPUT_Y 16
+#define INPUT_X 30
+#define INPUT_Y 20
 
 #define FPS 3
 
@@ -29,45 +29,43 @@ _Static_assert(
 u16 *writePage = ((u16 *)MEM_VRAM);
 
 u8 getFromFile() {
-    static unsigned fileIdx = 0;
-    static unsigned numCalls = 0;
-    static u8 cache[7];
-    if (numCalls % 8 == 0) {
-        memcpy(&cache, &(videoData[fileIdx]), 7);
-        fileIdx += 7;
-        if(fileIdx >= sizeof(videoData)){
-          fileIdx = 0;
-        }
+  static unsigned fileIdx = 0;
+  static unsigned numCalls = 0;
+  static u8 cache[5];
+  u8 result;
+  switch (numCalls % 8) {
+  case 0:
+    memcpy(&cache, &(videoData[fileIdx]), 5);
+    fileIdx += 5;
+    if (fileIdx >= sizeof(videoData)) {
+      fileIdx = 0;
     }
-    u8 result;
-    switch (numCalls % 8) {
-        case 0:
-            result = cache[0] >> 1;
-            break;
-        case 1:
-            result = ((cache[0] & 0x01) << 6) | ((cache[1] & 0xFC) >> 2);
-            break;
-        case 2:
-            result = ((cache[1] & 0x03) << 5) | ((cache[2] & 0xF8) >> 3);
-            break;
-        case 3:
-            result = ((cache[2] & 0x07) << 4) | ((cache[3] & 0xF0) >> 4);
-            break;
-        case 4:
-            result = ((cache[3] & 0x0F) << 3) | ((cache[4] & 0xE0) >> 5);
-            break;
-        case 5:
-            result = ((cache[4] & 0x1F) << 2) | ((cache[5] & 0xC0) >> 6);
-            break;
-        case 6:
-            result = ((cache[5] & 0x3F) << 1) | ((cache[6] & 0x80) >> 7);
-            break;
-        case 7:
-            result = (cache[6] & 0x7F);
-            break;
-    }
-    ++numCalls;
-    return result;
+    result = cache[0] >> 3;
+    break;
+  case 1:
+    result = ((cache[0] & 0x07) << 2) | ((cache[1] & 0xC0) >> 6);
+    break;
+  case 2:
+    result = (cache[1] & 0x3E) >> 1;
+    break;
+  case 3:
+    result = ((cache[1] & 0x01) << 4) | ((cache[2] & 0xF0) >> 4);
+    break;
+  case 4:
+    result = ((cache[2] & 0x0F) << 1) | ((cache[3] & 0x80) >> 7);
+    break;
+  case 5:
+    result = (cache[3] & 0x7C) >> 2;
+    break;
+  case 6:
+    result = ((cache[3] & 0x03) << 3) | ((cache[4] & 0xE0) >> 5);
+    break;
+  case 7:
+    result = (cache[4] & 0x1F);
+    break;
+  }
+  ++numCalls;
+  return result;
 }
 
 static volatile unsigned numFrames = 0;
