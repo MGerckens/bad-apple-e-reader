@@ -29,6 +29,8 @@ NEDCMAKE = nedcmake.exe
 NEDCENC  = nedcenc.exe
 NEDCBMP  = nedcbmp.exe
 
+EREADERTOOLSDIR = /c/Projects/BadAppleEncode/GBADevEnv
+
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
@@ -49,7 +51,7 @@ LDFLAGS	=	-g $(ARCH) -Wl,-Map,$(notdir $@).map
 #---------------------------------------------------------------------------------
 # path to tools - this can be deleted if you set the path to the toolchain in windows
 #---------------------------------------------------------------------------------
-export PATH		:=	$(DEVKITARM)/bin:/c/Projects/BadAppleEncode/GBADevEnv:$(PATH)
+export PATH		:=	$(DEVKITARM)/bin:$(PATH)
 
 #---------------------------------------------------------------------------------
 # any extra libraries we wish to link with the project
@@ -118,8 +120,8 @@ $(BUILD):
 	@[ -d $@ ] || mkdir -p $@
 	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
 
-all	: $(BUILD)
-# all	: $(BUILD) $(OUTPUT).sav $(OUTPUT).gba
+all	: convert
+
 #---------------------------------------------------------------------------------
 clean:
 	@echo clean ...
@@ -133,6 +135,9 @@ DEPENDS	:=	$(OFILES:.o=.d)
 #---------------------------------------------------------------------------------
 # main targets
 #---------------------------------------------------------------------------------
+convert: $(OUTPUT).elf
+	cd .. && python convert.py $(EREADERTOOLSDIR) $(DEVKITARM)/arm-none-eabi/bin
+
 $(OUTPUT).gba	:	$(OUTPUT).elf
 
 $(OUTPUT).elf	:	$(OFILES)
