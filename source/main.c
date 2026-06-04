@@ -1,16 +1,48 @@
-#include "tonc_bios.h"
-#include "tonc_irq.h"
-#include "tonc_memdef.h"
-#include "tonc_memmap.h"
-#include "tonc_video.h"
-
-#include <string.h>
+#include "def.h"
+#include "erapi.h"
+#include <stdbool.h>
 #include <stddef.h>
+#include <string.h>
+
+#define REG_VCOUNT (*(vu16 *)0x04000006)
+#define REG_DISPCNT (*(vu16 *)0x04000000)
+#define REG_BG0CNT (*(vu16 *)0x04000008)
+#define pal_bg_mem ((vu16 *)0x05000000)
+#define REG_BG0HOFS (*(vu16 *)(0x04000010))
+#define REG_BG0VOFS (*(vu16 *)(0x04000012))
+#define SOUNDCNT_X (*(vu16 *)0x04000084)
+#define BLDY (*(vu16 *)0x04000054)
+
+typedef u16 SCREENMAT[32][32];
+typedef u16 SCREENBLOCK[1024];
+typedef struct {
+  u32 data[8];
+} TILE;
+typedef TILE CHARBLOCK[512];
+
+#define se_mat ((SCREENMAT *)0x06000000)
+#define se_mem ((SCREENBLOCK *)0x06000000)
+#define tile_mem ((CHARBLOCK *)0x06000000)
+
+void vid_vsync() {
+  while (REG_VCOUNT >= 160)
+    ; // wait till VDraw
+  while (REG_VCOUNT < 160)
+    ; // wait till VBlank
+}
 
 extern const unsigned char videoData[22918];
 
-#define SCREEN_X M4_WIDTH
-#define SCREEN_Y M4_HEIGHT
+const unsigned char tileset[64] = {
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x11,
+    0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
+    0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
+    0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11};
+
+#define SCREEN_X 240
+#define SCREEN_Y 160
 
 #define INPUT_X 30
 #define INPUT_Y 20
@@ -22,11 +54,6 @@ extern const unsigned char videoData[22918];
 _Static_assert(
     X_DOWNSCALE % 2 == 0,
     "X downscale must be a multiple of 2 due to mode 4 byte-writing nonsense");
-
-#define BLACK 0
-#define WHITE 1
-
-u16 *writePage = ((u16 *)MEM_VRAM);
 
 u8 getFromFile() {
   static unsigned fileIdx = 0;
@@ -68,26 +95,30 @@ u8 getFromFile() {
   return result;
 }
 
-static volatile unsigned numFrames = 0;
-void vblankIntHandler(){
-  ++numFrames;
-}
-
-void waitForNextFrame(){
-  while(numFrames < (60 / FPS)){
-    ;
+void waitForNextFrame() {
+  for (int i = 0; i < (60 / FPS); ++i) {
+    vid_vsync();
   }
-  numFrames = 0;
 }
 
 int main() {
-  irq_init(NULL);
-  irq_add(II_VBLANK, vblankIntHandler);
+  BLDY = 0;
+  SOUNDCNT_X &= ~0x80;
 
-  pal_bg_mem[BLACK] = 0;
-  pal_bg_mem[WHITE] = 0x7FFF;
+  pal_bg_mem[0] = 0x0000;
+  pal_bg_mem[1] = 0x7FFF;
 
-  REG_DISPCNT = DCNT_MODE4 | DCNT_BG2;
+  memcpy(&tile_mem[0][0], &tileset[0], sizeof(tileset));
+  memset(&se_mem[30][0], 0, 32 * sizeof(SCREENBLOCK));
+  REG_BG0HOFS = 0;
+  REG_BG0VOFS = 0;
+
+  // REG_BG0CNT = BG_CBB(0) | BG_SBB(30) | BG_4BPP | BG_REG_32x32;
+  // REG_DISPCNT = DCNT_MODE0 | DCNT_BG0;
+  REG_DISPCNT = 0x0100;   // mode 0 background 0
+  REG_BG0CNT = (30 << 8); // CBB 0, SBB 30, 4bpp, 32x32
+  ERAPI_LayerShow(0);
+
   u8 currentColor = getFromFile();
   unsigned numChunks = 0;
   unsigned numChunksWritten = 0;
@@ -96,27 +127,20 @@ int main() {
   while (1) {
     numChunks = getFromFile();
     for (unsigned i = 0; i < numChunks; ++i) {
-      for (unsigned y_off = 0; y_off < Y_DOWNSCALE; ++y_off) {
-        for (unsigned x_off = 1; x_off < X_DOWNSCALE; x_off += 2) {
-          writePage[((((numChunksWritten / INPUT_X) * Y_DOWNSCALE + y_off) *
-                      SCREEN_X) +
-                     ((numChunksWritten % INPUT_X) * X_DOWNSCALE + x_off)) /
-                    2] = (currentColor << 8) | currentColor;
-        }
-      }
+      se_mat[30][numChunksWritten / INPUT_X][numChunksWritten % INPUT_X] =
+          currentColor;
       ++numChunksWritten;
       if (numChunksWritten >= INPUT_X * INPUT_Y) {
         numChunksWritten = 0;
         newFrame = true;
-        currentColor = (getFromFile() == 0) ? BLACK : WHITE;
+        currentColor = (getFromFile() == 0) ? 0 : 1;
         waitForNextFrame();
-        writePage = vid_flip();
       } else {
         newFrame = false;
       }
     }
     if (!newFrame) {
-      currentColor = (currentColor == WHITE) ? BLACK : WHITE;
+      currentColor = (currentColor == 0) ? 1 : 0;
     }
   }
 

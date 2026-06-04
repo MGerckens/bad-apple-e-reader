@@ -2,3 +2,6 @@ build/
 *.elf
 *.gba
 *.sav
+*.vpk
+*.raw
+*.bin

@@ -16,11 +16,18 @@ include $(DEVKITARM)/gba_rules
 # DATA is a list of directories containing data files
 # INCLUDES is a list of directories containing header files
 #---------------------------------------------------------------------------------
-TARGET		:=	$(shell basename $(CURDIR))
+TARGET		:=	$(shell basename $(CURDIR))_mb
 BUILD		:=	build
 SOURCES		:=	source
 DATA		:=	
 INCLUDES	:=
+
+OBJCOPY  = arm-none-eabi-objcopy.exe
+NEVPK    = nevpk.exe
+NESAV    = neflmake.exe
+NEDCMAKE = nedcmake.exe
+NEDCENC  = nedcenc.exe
+NEDCBMP  = nedcbmp.exe
 
 #---------------------------------------------------------------------------------
 # options for code generation
@@ -42,18 +49,18 @@ LDFLAGS	=	-g $(ARCH) -Wl,-Map,$(notdir $@).map
 #---------------------------------------------------------------------------------
 # path to tools - this can be deleted if you set the path to the toolchain in windows
 #---------------------------------------------------------------------------------
-export PATH		:=	$(DEVKITARM)/bin:$(PATH)
+export PATH		:=	$(DEVKITARM)/bin:/c/Projects/BadAppleEncode/GBADevEnv:$(PATH)
 
 #---------------------------------------------------------------------------------
 # any extra libraries we wish to link with the project
 #---------------------------------------------------------------------------------
-LIBS	:=	-lgba -ltonc
+LIBS	:=	-lgba
 
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing
 # include and lib
 #---------------------------------------------------------------------------------
-LIBDIRS	:=	$(LIBGBA) $(DEVKITPRO)/libtonc
+LIBDIRS	:=	$(LIBGBA)
 
 #---------------------------------------------------------------------------------
 # no real need to edit anything past this point unless you need to add additional
@@ -112,6 +119,7 @@ $(BUILD):
 	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
 
 all	: $(BUILD)
+# all	: $(BUILD) $(OUTPUT).sav $(OUTPUT).gba
 #---------------------------------------------------------------------------------
 clean:
 	@echo clean ...
