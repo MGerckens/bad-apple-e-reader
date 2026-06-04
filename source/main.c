@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <string.h>
 
+// copied structs and memory mappings from libtonc, to avoid linking it, which saves about 1.5kB
 #define REG_VCOUNT (*(vu16 *)0x04000006)
 #define REG_DISPCNT (*(vu16 *)0x04000000)
 #define REG_BG0CNT (*(vu16 *)0x04000008)
