@@ -101,6 +101,19 @@ void waitForNextFrame() {
   }
 }
 
+unsigned currentSbb = 30;
+void flip(){
+  // write one frame ahead then change actiuve screen block to prevent tearing
+  if(currentSbb == 30){
+    currentSbb = 31;
+    REG_BG0CNT = (30 << 8);
+
+  }else{
+    currentSbb = 30;
+    REG_BG0CNT = (31 << 8);
+  }
+}
+
 int main() {
   BLDY = 0;
   SOUNDCNT_X &= ~0x80;
@@ -116,7 +129,7 @@ int main() {
   // REG_BG0CNT = BG_CBB(0) | BG_SBB(30) | BG_4BPP | BG_REG_32x32;
   // REG_DISPCNT = DCNT_MODE0 | DCNT_BG0;
   REG_DISPCNT = 0x0100;   // mode 0 background 0
-  REG_BG0CNT = (30 << 8); // CBB 0, SBB 30, 4bpp, 32x32
+  REG_BG0CNT = (31 << 8); // CBB 0, SBB 31, 4bpp, 32x32
   ERAPI_LayerShow(0);
 
   u8 currentColor = getFromFile();
@@ -127,7 +140,7 @@ int main() {
   while (1) {
     numChunks = getFromFile();
     for (unsigned i = 0; i < numChunks; ++i) {
-      se_mat[30][numChunksWritten / INPUT_X][numChunksWritten % INPUT_X] =
+      se_mat[currentSbb][numChunksWritten / INPUT_X][numChunksWritten % INPUT_X] =
           currentColor;
       ++numChunksWritten;
       if (numChunksWritten >= INPUT_X * INPUT_Y) {
@@ -135,6 +148,7 @@ int main() {
         newFrame = true;
         currentColor = (getFromFile() == 0) ? 0 : 1;
         waitForNextFrame();
+        flip();
       } else {
         newFrame = false;
       }
