@@ -30,7 +30,9 @@ NEDCMAKE = nedcmake.exe
 NEDCENC  = nedcenc.exe
 NEDCBMP  = nedcbmp.exe
 
-EREADERTOOLSDIR = /c/Projects/BadAppleEncode/GBADevEnv
+# tool paths
+EREADERTOOLS_DIR = /c/Projects/nedclib-fork/Release
+NEFLMAKE_DIR = /c/Projects/BadAppleEncode/GBADevEnv
 
 #---------------------------------------------------------------------------------
 # options for code generation
@@ -137,7 +139,7 @@ DEPENDS	:=	$(OFILES:.o=.d)
 # main targets
 #---------------------------------------------------------------------------------
 convert: $(OUTPUT).elf
-	cd .. && python convert.py $(EREADERTOOLSDIR) $(DEVKITARM)/arm-none-eabi/bin
+	cd .. && python convert.py $(EREADERTOOLS_DIR) $(NEFLMAKE_DIR) $(DEVKITARM)/arm-none-eabi/bin
 
 $(OUTPUT).gba	:	$(OUTPUT).elf
 
