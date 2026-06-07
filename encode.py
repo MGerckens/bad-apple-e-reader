@@ -2,6 +2,7 @@ import cv2 as cv
 import sys
 import bitarray
 import bitarray.util
+import math
 
 hDownscale = 8
 assert 240 % hDownscale == 0
@@ -13,7 +14,7 @@ assert 30 % fps == 0
 # max size of segment in bits
 intSize = 5
 
-if len(sys.argv < 2):
+if len(sys.argv) < 2:
     raise ValueError("Pass the path to the input video file as the first cmdline arg")
 path = sys.argv[1]
 cap = cv.VideoCapture(path)
@@ -64,8 +65,17 @@ while cap.isOpened():
         print("frame ", frameNum, "done")
     frameNum += 1
 
+if len(out) % 8 != 0:
+    out.extend(0 for _ in range(0, math.ceil(len(out) / 8) * 8 - len(out)))
+
 with open("out.bin", "wb") as outFile:
     outFile.write(out)
 
 cap.release()
 cv.destroyAllWindows()
+
+with open("source/video.c", "wb") as result_file:
+    result_file.write(b"const unsigned char videoData[%u] = {" % (len(out) // 8))
+    for i in range(0, len(out) // 8):
+        result_file.write(b"0x%02X," % bitarray.util.ba2int(out[i * 8 : (i + 1) * 8]))
+    result_file.write(b"};")
