@@ -53,44 +53,36 @@ const unsigned char tileset[64] = {
 
 #define X_DOWNSCALE (SCREEN_X / INPUT_X)
 #define Y_DOWNSCALE (SCREEN_Y / INPUT_Y)
-_Static_assert(
-    X_DOWNSCALE % 2 == 0,
-    "X downscale must be a multiple of 2 due to mode 4 byte-writing nonsense");
 
-unsigned fileIdx = 0;
-unsigned numCalls = 0;
-u8 getFromFile() {
-  static u8 cache[5];
-  u8 result;
-  switch (numCalls % 8) {
-  case 0:
-    memcpy(&cache, &(videoData[fileIdx]), 5);
-    fileIdx += 5;
-    result = cache[0] >> 3;
-    break;
-  case 1:
-    result = ((cache[0] & 0x07) << 2) | ((cache[1] & 0xC0) >> 6);
-    break;
-  case 2:
-    result = (cache[1] & 0x3E) >> 1;
-    break;
-  case 3:
-    result = ((cache[1] & 0x01) << 4) | ((cache[2] & 0xF0) >> 4);
-    break;
-  case 4:
-    result = ((cache[2] & 0x0F) << 1) | ((cache[3] & 0x80) >> 7);
-    break;
-  case 5:
-    result = (cache[3] & 0x7C) >> 2;
-    break;
-  case 6:
-    result = ((cache[3] & 0x03) << 3) | ((cache[4] & 0xE0) >> 5);
-    break;
-  case 7:
-    result = (cache[4] & 0x1F);
-    break;
+u8 popcount(u8 n) {
+  u8 c = 0;
+  for (; n; ++c)
+    n &= n - 1;
+  return c;
+}
+
+unsigned fileBitIdx = 0;
+u8 getFromFile(unsigned numBits) {
+  u8 idxMod8 = fileBitIdx % 8;
+
+  u8 mask1 = ((1 << (numBits)) - 1) << (8 - numBits) >> idxMod8;
+  u8 leftoverBits = (numBits < (8 - idxMod8)) ? 0 : numBits - (8 - idxMod8);
+  u8 mask2 = ((1 << leftoverBits) - 1) << (8 - leftoverBits);
+
+  u8 val = videoData[fileBitIdx / 8];
+  val &= mask1;
+
+  u8 result = 0;
+  if (leftoverBits != 0) {
+    u8 valPart2 = videoData[(fileBitIdx + numBits) / 8];
+    valPart2 &= mask2;
+    valPart2 >>= (8 - leftoverBits);
+    result = (val << leftoverBits) | valPart2;
+  } else {
+    result = val >> ((8 - numBits) - idxMod8);
   }
-  ++numCalls;
+
+  fileBitIdx += numBits;
   return result;
 }
 
@@ -133,13 +125,13 @@ int main() {
   while (true) {
     memset(&se_mem[30][0], 0, 32 * sizeof(SCREENBLOCK));
     memset(&se_mem[28][0], 0, 32 * sizeof(SCREENBLOCK));
-    u8 currentColor = getFromFile();
+    u8 currentColor = getFromFile(5);
     unsigned numChunks = 0;
     unsigned numChunksWritten = 0;
     bool newFrame = true;
     waitForNextFrame();
-    while (fileIdx < sizeof(videoData)) {
-      numChunks = getFromFile();
+    while (fileBitIdx < (sizeof(videoData) * 8)) {
+      numChunks = getFromFile(5);
       for (unsigned i = 0; i < numChunks; ++i) {
         se_mat[currentSbb][ERAPI_Div(numChunksWritten, INPUT_X)]
               [ERAPI_Mod(numChunksWritten, INPUT_X)] = currentColor;
@@ -147,7 +139,7 @@ int main() {
         if (numChunksWritten >= INPUT_X * INPUT_Y) {
           numChunksWritten = 0;
           newFrame = true;
-          currentColor = (getFromFile() == 0) ? 0 : 1;
+          currentColor = (getFromFile(5) == 0) ? 0 : 1;
           waitForNextFrame();
           flip();
         } else {
@@ -158,8 +150,7 @@ int main() {
         currentColor = (currentColor == 0) ? 1 : 0;
       }
     }
-    numCalls = 0;
-    fileIdx = 0;
+    fileBitIdx = 0;
   }
 
   return 0;
