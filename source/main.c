@@ -4,7 +4,8 @@
 #include <stddef.h>
 #include <string.h>
 
-// copied structs and memory mappings from libtonc, to avoid linking it, which saves about 1.5kB
+// copied structs and memory mappings from libtonc, to avoid linking it, which
+// saves about 1.5kB
 #define REG_VCOUNT (*(vu16 *)0x04000006)
 #define REG_DISPCNT (*(vu16 *)0x04000000)
 #define REG_BG0CNT (*(vu16 *)0x04000008)
@@ -56,18 +57,15 @@ _Static_assert(
     X_DOWNSCALE % 2 == 0,
     "X downscale must be a multiple of 2 due to mode 4 byte-writing nonsense");
 
+unsigned fileIdx = 0;
+unsigned numCalls = 0;
 u8 getFromFile() {
-  static unsigned fileIdx = 0;
-  static unsigned numCalls = 0;
   static u8 cache[5];
   u8 result;
   switch (numCalls % 8) {
   case 0:
     memcpy(&cache, &(videoData[fileIdx]), 5);
     fileIdx += 5;
-    if (fileIdx >= sizeof(videoData)) {
-      fileIdx = 0;
-    }
     result = cache[0] >> 3;
     break;
   case 1:
@@ -97,21 +95,21 @@ u8 getFromFile() {
 }
 
 void waitForNextFrame() {
-  for (int i = 0; i < (60 / FPS); ++i) {
+  // for (int i = 0; i < (60 / FPS); ++i) {
     vid_vsync();
-  }
+  // }
 }
 
 unsigned currentSbb = 30;
-void flip(){
+void flip() {
   // write one frame ahead then change actiuve screen block to prevent tearing
-  if(currentSbb == 30){
-    currentSbb = 31;
+  if (currentSbb == 30) {
+    currentSbb = 28;
     REG_BG0CNT = (30 << 8);
 
-  }else{
+  } else {
     currentSbb = 30;
-    REG_BG0CNT = (31 << 8);
+    REG_BG0CNT = (28 << 8);
   }
 }
 
@@ -123,40 +121,45 @@ int main() {
   pal_bg_mem[1] = 0x7FFF;
 
   memcpy(&tile_mem[0][0], &tileset[0], sizeof(tileset));
-  memset(&se_mem[30][0], 0, 32 * sizeof(SCREENBLOCK));
   REG_BG0HOFS = 0;
   REG_BG0VOFS = 0;
 
   // REG_BG0CNT = BG_CBB(0) | BG_SBB(30) | BG_4BPP | BG_REG_32x32;
   // REG_DISPCNT = DCNT_MODE0 | DCNT_BG0;
   REG_DISPCNT = 0x0100;   // mode 0 background 0
-  REG_BG0CNT = (31 << 8); // CBB 0, SBB 31, 4bpp, 32x32
+  REG_BG0CNT = (28 << 8); // CBB 0, SBB 28, 4bpp, 32x32
   ERAPI_LayerShow(0);
 
-  u8 currentColor = getFromFile();
-  unsigned numChunks = 0;
-  unsigned numChunksWritten = 0;
-  bool newFrame = true;
-  waitForNextFrame();
-  while (1) {
-    numChunks = getFromFile();
-    for (unsigned i = 0; i < numChunks; ++i) {
-      se_mat[currentSbb][numChunksWritten / INPUT_X][numChunksWritten % INPUT_X] =
-          currentColor;
-      ++numChunksWritten;
-      if (numChunksWritten >= INPUT_X * INPUT_Y) {
-        numChunksWritten = 0;
-        newFrame = true;
-        currentColor = (getFromFile() == 0) ? 0 : 1;
-        waitForNextFrame();
-        flip();
-      } else {
-        newFrame = false;
+  while (true) {
+    memset(&se_mem[30][0], 0, 32 * sizeof(SCREENBLOCK));
+    memset(&se_mem[28][0], 0, 32 * sizeof(SCREENBLOCK));
+    u8 currentColor = getFromFile();
+    unsigned numChunks = 0;
+    unsigned numChunksWritten = 0;
+    bool newFrame = true;
+    waitForNextFrame();
+    while (fileIdx < sizeof(videoData)) {
+      numChunks = getFromFile();
+      for (unsigned i = 0; i < numChunks; ++i) {
+        se_mat[currentSbb][ERAPI_Div(numChunksWritten, INPUT_X)]
+              [ERAPI_Mod(numChunksWritten, INPUT_X)] = currentColor;
+        ++numChunksWritten;
+        if (numChunksWritten >= INPUT_X * INPUT_Y) {
+          numChunksWritten = 0;
+          newFrame = true;
+          currentColor = (getFromFile() == 0) ? 0 : 1;
+          waitForNextFrame();
+          flip();
+        } else {
+          newFrame = false;
+        }
+      }
+      if (!newFrame) {
+        currentColor = (currentColor == 0) ? 1 : 0;
       }
     }
-    if (!newFrame) {
-      currentColor = (currentColor == 0) ? 1 : 0;
-    }
+    numCalls = 0;
+    fileIdx = 0;
   }
 
   return 0;
