@@ -95,9 +95,9 @@ u8 getFromFile() {
 }
 
 void waitForNextFrame() {
-  // for (int i = 0; i < (60 / FPS); ++i) {
+  for (int i = 0; i < (60 / FPS); ++i) {
     vid_vsync();
-  // }
+  }
 }
 
 unsigned currentSbb = 30;
