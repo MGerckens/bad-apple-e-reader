@@ -27,25 +27,25 @@ with open(path, "rb") as binFile:
 numCalls = 0
 
 bitOffset = 0
-def getFromFile(numBits=5):
+def getFromFile(numBits):
     global bitOffset
     val = bitarray.util.ba2int(fileContents[bitOffset : bitOffset + numBits])
     bitOffset += numBits
     return val
 
 preview = False
-currentColor = 0 if (getFromFile() == 0) else 255
+currentColor = 0 if (getFromFile(1) == 0) else 255
 currentPixel = 0
 thisFrame = np.empty((hRes * vRes, 1), np.uint8)
 newFrame = False
 
 while bitOffset < len(fileContents):
-    numPixels = getFromFile()
+    numPixels = getFromFile(5)
     for i in range(0, numPixels):
         thisFrame[currentPixel] = currentColor
         currentPixel += 1
         if currentPixel >= hRes * vRes:
-            currentColor = 0 if (getFromFile() == 0) else 255
+            currentColor = 0 if (getFromFile(1) == 0) else 255
             currentPixel = 0
             frame = np.reshape(thisFrame, (vRes, hRes))
             if preview:

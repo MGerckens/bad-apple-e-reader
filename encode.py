@@ -12,7 +12,7 @@ fps = 3
 assert 30 % fps == 0
 
 # max size of segment in bits
-intSize = 5
+defaultIntSize = 5
 
 if len(sys.argv) < 2:
     raise ValueError("Pass the path to the input video file as the first cmdline arg")
@@ -20,15 +20,16 @@ path = sys.argv[1]
 cap = cv.VideoCapture(path)
 
 out = bitarray.bitarray()
-frameNum = 0 
+frameNum = 0
 maxNumPixels = 0
 
-def addToArray(out : bitarray.bitarray, num:int):
-    while num >= (2 ** intSize):
-        out.extend(bitarray.util.int2ba(2 ** intSize - 1, intSize))
-        num -= (2 ** intSize - 1)
-        out.extend(bitarray.util.int2ba(0, intSize))
-    out.extend(bitarray.util.int2ba(num, intSize))
+
+def addToArray(out: bitarray.bitarray, num: int, numBits: int = defaultIntSize):
+    while num >= (2**numBits):
+        out.extend(bitarray.util.int2ba(2**numBits - 1, numBits))
+        num -= 2**numBits - 1
+        out.extend(bitarray.util.int2ba(0, numBits))
+    out.extend(bitarray.util.int2ba(num, numBits))
 
 while cap.isOpened():
     ret, ogFrame = cap.read()
@@ -37,7 +38,7 @@ while cap.isOpened():
     if frameNum % (30 // fps) != 0:
         frameNum += 1
         continue
-    
+
     _, frame = cv.threshold(
         cv.cvtColor(ogFrame, cv.COLOR_BGR2GRAY), 127, 255, cv.THRESH_BINARY
     )
@@ -48,12 +49,12 @@ while cap.isOpened():
     vRatio = endV / startV
     smallFrame = cv.resize(frame, None, None, hRatio, vRatio, cv.INTER_AREA)
     currentColor = smallFrame[0][0] != 0
-    addToArray(out, 1 if currentColor != 0 else 0)
-    
+    addToArray(out, 1 if currentColor != 0 else 0, 1)
+
     numPixelsOfThisColor = 0
     for row in range(0, endV):
         for col in range(0, endH):
-            color = (smallFrame[row][col] != 0)
+            color = smallFrame[row][col] != 0
             if color == currentColor:
                 numPixelsOfThisColor += 1
             else:

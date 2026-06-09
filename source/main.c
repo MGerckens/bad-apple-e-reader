@@ -33,7 +33,7 @@ void vid_vsync() {
     ; // wait till VBlank
 }
 
-extern const unsigned char videoData[22918];
+extern const unsigned char videoData[22589];
 
 const unsigned char tileset[64] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -53,13 +53,6 @@ const unsigned char tileset[64] = {
 
 #define X_DOWNSCALE (SCREEN_X / INPUT_X)
 #define Y_DOWNSCALE (SCREEN_Y / INPUT_Y)
-
-u8 popcount(u8 n) {
-  u8 c = 0;
-  for (; n; ++c)
-    n &= n - 1;
-  return c;
-}
 
 unsigned fileBitIdx = 0;
 u8 getFromFile(unsigned numBits) {
@@ -125,7 +118,7 @@ int main() {
   while (true) {
     memset(&se_mem[30][0], 0, 32 * sizeof(SCREENBLOCK));
     memset(&se_mem[28][0], 0, 32 * sizeof(SCREENBLOCK));
-    u8 currentColor = getFromFile(5);
+    u8 currentColor = getFromFile(1);
     unsigned numChunks = 0;
     unsigned numChunksWritten = 0;
     bool newFrame = true;
@@ -139,7 +132,7 @@ int main() {
         if (numChunksWritten >= INPUT_X * INPUT_Y) {
           numChunksWritten = 0;
           newFrame = true;
-          currentColor = (getFromFile(5) == 0) ? 0 : 1;
+          currentColor = (getFromFile(1) == 0) ? 0 : 1;
           waitForNextFrame();
           flip();
         } else {
