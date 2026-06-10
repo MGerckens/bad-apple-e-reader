@@ -9,23 +9,9 @@
 // saves about 1.5kB
 #define REG_VCOUNT (*(vu16 *)0x04000006)
 #define REG_DISPCNT (*(vu16 *)0x04000000)
-#define REG_BG0CNT (*(vu16 *)0x04000008)
 #define pal_bg_mem ((vu16 *)0x05000000)
-#define REG_BG0HOFS (*(vu16 *)(0x04000010))
-#define REG_BG0VOFS (*(vu16 *)(0x04000012))
 #define SOUNDCNT_X (*(vu16 *)0x04000084)
 #define BLDY (*(vu16 *)0x04000054)
-
-typedef u16 SCREENMAT[32][32];
-typedef u16 SCREENBLOCK[1024];
-typedef struct {
-  u32 data[8];
-} TILE;
-typedef TILE CHARBLOCK[512];
-
-#define se_mat ((SCREENMAT *)0x06000000)
-#define se_mem ((SCREENBLOCK *)0x06000000)
-#define tile_mem ((CHARBLOCK *)0x06000000)
 
 inline static void vid_vsync() {
   while (REG_VCOUNT >= 160)
@@ -78,23 +64,10 @@ inline static void waitForNextFrame() {
   }
 }
 
-unsigned currentSbb = 30;
+u16 *writePage = ((u16 *)0x06000000);
 inline static void flip() {
-  // write one frame ahead then change actiuve screen block to prevent tearing
-  if (currentSbb == 30) {
-    currentSbb = 28;
-    REG_BG0CNT = (30 << 8);
-
-  } else {
-    currentSbb = 30;
-    REG_BG0CNT = (28 << 8);
-  }
-}
-
-void memsetImpl(void* dest, u8 val, unsigned count){
-  for(unsigned i = 0; i < count; ++i){
-    *((u8*)dest + i) = val;
-  }
+  writePage = (u16 *)((u32)writePage ^ 0x0A000);
+  REG_DISPCNT ^= 0x0010; // update control register
 }
 
 int main() {
@@ -104,15 +77,9 @@ int main() {
   pal_bg_mem[0] = 0x0000;
   pal_bg_mem[1] = 0x7FFF;
 
-  memsetImpl(&tile_mem[0][0], 0, sizeof(TILE));
-  memsetImpl(&tile_mem[0][1], 0x11, sizeof(TILE));
-
-  REG_DISPCNT = 0x0100;   // mode 0 background 0
-  REG_BG0CNT = (28 << 8); // CBB 0, SBB 28, 4bpp, 32x32
+  REG_DISPCNT = 0x0414; // mode 0 background 0
 
   while (true) {
-    memsetImpl(&se_mem[30][0], 0, 32 * sizeof(SCREENBLOCK));
-    memsetImpl(&se_mem[28][0], 0, 32 * sizeof(SCREENBLOCK));
     u8 currentColor = getFromFile(1);
     unsigned numChunks = 0;
     unsigned numChunksWritten = 0;
@@ -121,8 +88,14 @@ int main() {
     while (fileBitIdx < (sizeof(videoData) * 8)) {
       numChunks = getFromFile(5);
       for (unsigned i = 0; i < numChunks; ++i) {
-        se_mat[currentSbb][ERAPI_Div(numChunksWritten, INPUT_X)]
-              [ERAPI_Mod(numChunksWritten, INPUT_X)] = currentColor;
+        for (unsigned y_off = 0; y_off < Y_DOWNSCALE; ++y_off) {
+          for (unsigned x_off = 1; x_off < X_DOWNSCALE; x_off += 2) {
+            writePage[((((numChunksWritten / INPUT_X) * Y_DOWNSCALE + y_off) *
+                        SCREEN_X) +
+                       ((numChunksWritten % INPUT_X) * X_DOWNSCALE + x_off)) /
+                      2] = (currentColor << 8) | currentColor;
+          }
+        }
         ++numChunksWritten;
         if (numChunksWritten >= INPUT_X * INPUT_Y) {
           numChunksWritten = 0;
