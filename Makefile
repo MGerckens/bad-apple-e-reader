@@ -39,7 +39,7 @@ NEFLMAKE_DIR = /c/Projects/BadAppleEncode/GBADevEnv
 #---------------------------------------------------------------------------------
 ARCH	:=	-mthumb -mthumb-interwork
 
-CFLAGS	:=	-g -Wall -Oz\
+CFLAGS	:=	-Wall -Oz\
 			-mcpu=arm7tdmi -mtune=arm7tdmi\
  			-fomit-frame-pointer\
 			-ffast-math \
@@ -49,7 +49,7 @@ CFLAGS	:=	-g -Wall -Oz\
 CFLAGS	+=	$(INCLUDE)
 
 ASFLAGS	:=	$(ARCH)
-LDFLAGS	=	-g $(ARCH) -Wl,-Map,$(notdir $@).map
+LDFLAGS	=	$(ARCH) -Wl,-Map,$(notdir $@).map
 
 #---------------------------------------------------------------------------------
 # path to tools - this can be deleted if you set the path to the toolchain in windows

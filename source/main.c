@@ -1,8 +1,9 @@
 #include "def.h"
 #include "erapi.h"
-#include <stdbool.h>
-#include <stddef.h>
-#include <string.h>
+
+#define bool u8
+#define true 1
+#define false 0
 
 // copied structs and memory mappings from libtonc, to avoid linking it, which
 // saves about 1.5kB
@@ -26,7 +27,7 @@ typedef TILE CHARBLOCK[512];
 #define se_mem ((SCREENBLOCK *)0x06000000)
 #define tile_mem ((CHARBLOCK *)0x06000000)
 
-void vid_vsync() {
+inline static void vid_vsync() {
   while (REG_VCOUNT >= 160)
     ; // wait till VDraw
   while (REG_VCOUNT < 160)
@@ -34,14 +35,6 @@ void vid_vsync() {
 }
 
 extern const unsigned char videoData[22589];
-
-const unsigned char tileset[64] = {
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x11,
-    0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
-    0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
-    0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11};
 
 #define SCREEN_X 240
 #define SCREEN_Y 160
@@ -79,14 +72,14 @@ u8 getFromFile(unsigned numBits) {
   return result;
 }
 
-void waitForNextFrame() {
+inline static void waitForNextFrame() {
   for (int i = 0; i < (60 / FPS); ++i) {
     vid_vsync();
   }
 }
 
 unsigned currentSbb = 30;
-void flip() {
+inline static void flip() {
   // write one frame ahead then change actiuve screen block to prevent tearing
   if (currentSbb == 30) {
     currentSbb = 28;
@@ -98,6 +91,12 @@ void flip() {
   }
 }
 
+void memsetImpl(void* dest, u8 val, unsigned count){
+  for(unsigned i = 0; i < count; ++i){
+    *((u8*)dest + i) = val;
+  }
+}
+
 int main() {
   BLDY = 0;
   SOUNDCNT_X &= ~0x80;
@@ -105,19 +104,15 @@ int main() {
   pal_bg_mem[0] = 0x0000;
   pal_bg_mem[1] = 0x7FFF;
 
-  memcpy(&tile_mem[0][0], &tileset[0], sizeof(tileset));
-  REG_BG0HOFS = 0;
-  REG_BG0VOFS = 0;
+  memsetImpl(&tile_mem[0][0], 0, sizeof(TILE));
+  memsetImpl(&tile_mem[0][1], 0x11, sizeof(TILE));
 
-  // REG_BG0CNT = BG_CBB(0) | BG_SBB(30) | BG_4BPP | BG_REG_32x32;
-  // REG_DISPCNT = DCNT_MODE0 | DCNT_BG0;
   REG_DISPCNT = 0x0100;   // mode 0 background 0
   REG_BG0CNT = (28 << 8); // CBB 0, SBB 28, 4bpp, 32x32
-  ERAPI_LayerShow(0);
 
   while (true) {
-    memset(&se_mem[30][0], 0, 32 * sizeof(SCREENBLOCK));
-    memset(&se_mem[28][0], 0, 32 * sizeof(SCREENBLOCK));
+    memsetImpl(&se_mem[30][0], 0, 32 * sizeof(SCREENBLOCK));
+    memsetImpl(&se_mem[28][0], 0, 32 * sizeof(SCREENBLOCK));
     u8 currentColor = getFromFile(1);
     unsigned numChunks = 0;
     unsigned numChunksWritten = 0;
