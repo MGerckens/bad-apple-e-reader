@@ -1,0 +1,1 @@
+Bad Apple for the GBA e-Reader. Runs at 30x20, 3fps, with no sound. Encodes to 11 long dotcodes. I don't actually own an e-Reader, but it works on emulator. If anyone runs this on real hardware, I would be thrilled if you would upload a video and send it to me.
