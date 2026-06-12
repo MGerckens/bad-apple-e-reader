@@ -1,5 +1,4 @@
 #include "def.h"
-#include "erapi.h"
 
 #define bool u8
 #define true 1
