@@ -1,23 +1,8 @@
-#include "def.h"
-
-#define bool u8
-#define true 1
-#define false 0
-
-// copied structs and memory mappings from libtonc, to avoid linking it, which
-// saves about 1.5kB
-#define REG_VCOUNT (*(vu16 *)0x04000006)
-#define REG_DISPCNT (*(vu16 *)0x04000000)
-#define pal_bg_mem ((vu16 *)0x05000000)
-#define SOUNDCNT_X (*(vu16 *)0x04000084)
-#define BLDY (*(vu16 *)0x04000054)
-
-inline static void vid_vsync() {
-  while (REG_VCOUNT >= 160)
-    ; // wait till VDraw
-  while (REG_VCOUNT < 160)
-    ; // wait till VBlank
-}
+#include "tonc_bios.h"
+#include "tonc_irq.h"
+#include "tonc_memdef.h"
+#include "tonc_memmap.h"
+#include "tonc_video.h"
 
 extern const unsigned char videoData[22589];
 
@@ -57,26 +42,29 @@ u8 getFromFile(unsigned numBits) {
   return result;
 }
 
-inline static void waitForNextFrame() {
-  for (int i = 0; i < (60 / FPS); ++i) {
-    vid_vsync();
+static volatile unsigned numFrames = 0;
+void vblankIntHandler() { ++numFrames; }
+
+void waitForNextFrame() {
+  while (numFrames < (60 / FPS)) {
+    ;
   }
+  numFrames = 0;
 }
 
-u16 *writePage = ((u16 *)0x06000000);
-inline static void flip() {
-  writePage = (u16 *)((u32)writePage ^ 0x0A000);
-  REG_DISPCNT ^= 0x0010; // update control register
-}
+u16 *writePage = (u16*)MEM_VRAM;
 
 int main() {
-  BLDY = 0;
-  SOUNDCNT_X &= ~0x80;
-
   pal_bg_mem[0] = 0x0000;
   pal_bg_mem[1] = 0x7FFF;
+  
+  irq_init(NULL);
+  irq_add(II_VBLANK, vblankIntHandler);
 
-  REG_DISPCNT = 0x0414; // mode 0 background 0
+  REG_BLDY = 0;
+  REG_SNDSTAT &= ~0x80;
+
+  REG_DISPCNT = 0x0404;
 
   while (true) {
     u8 currentColor = getFromFile(1);
@@ -101,7 +89,7 @@ int main() {
           newFrame = true;
           currentColor = (getFromFile(1) == 0) ? 0 : 1;
           waitForNextFrame();
-          flip();
+          writePage = vid_flip();
         } else {
           newFrame = false;
         }
